@@ -27,11 +27,21 @@ body {
 ::-webkit-scrollbar { display: none; }
 * { scrollbar-width: none; }
 
-.screen-enter {
-  animation: fadeIn 0.25s ease-in-out;
+/* ── Transitions: forward = slide in from right, back = slide in from left ── */
+.screen-slide-forward {
+  animation: slideInRight 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+.screen-slide-back {
+  animation: slideInLeft 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0.85; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-28%); opacity: 0.85; }
+  to   { transform: translateX(0);    opacity: 1; }
 }

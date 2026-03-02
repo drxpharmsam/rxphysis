@@ -10,7 +10,7 @@ interface AccountScreenProps {
 
 export default function AccountScreen({ activeTab, setActiveTab, onBack }: AccountScreenProps) {
   return (
-    <div className="flex flex-col min-h-screen screen-enter" style={{ background: "#eaf6f8" }}>
+    <div className="flex flex-col min-h-screen" style={{ background: "#eaf6f8" }}>
 
       {/* ── Header ──────────────────────────────────────── */}
       <div className="px-5 pt-14 pb-20 relative overflow-hidden"

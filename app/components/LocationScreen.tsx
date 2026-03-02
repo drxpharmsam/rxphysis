@@ -7,7 +7,7 @@ interface LocationScreenProps {
 
 export default function LocationScreen({ onAllow, onSkip }: LocationScreenProps) {
   return (
-    <div className="relative flex flex-col min-h-screen screen-enter">
+    <div className="relative flex flex-col min-h-screen">
       {/* Background — navy gradient simulating underlying app */}
       <div className="absolute inset-0"
            style={{ background: "linear-gradient(145deg, #011C40 0%, #023859 55%, #26658C 100%)" }} />

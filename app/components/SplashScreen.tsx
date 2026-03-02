@@ -6,7 +6,7 @@ interface SplashScreenProps {
 
 export default function SplashScreen({ onContinue }: SplashScreenProps) {
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen overflow-hidden screen-enter"
+    <div className="relative flex flex-col items-center justify-center min-h-screen overflow-hidden"
          style={{ background: "linear-gradient(145deg, #011C40 0%, #023859 55%, #26658C 100%)" }}>
       {/* Decorative blobs */}
       <div className="absolute top-[-80px] left-[-60px] w-56 h-56 rounded-full opacity-20 blur-3xl"
