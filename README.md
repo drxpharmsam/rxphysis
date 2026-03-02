@@ -1,45 +1,61 @@
-# rxphysis
+# mediflow-frontend
 
-## Frontend
+A vanilla-JS PWA for the MediFlow digital pharmacy platform.
 
-The frontend is a vanilla-JS PWA (originally from [drxpharmsam/mediflow-frontend](https://github.com/drxpharmsam/mediflow-frontend)) and lives in the [`frontend/`](./frontend/) directory.
+## Configuration
 
-### Setup & running locally
-
-The frontend has **no build step** — open `frontend/index.html` directly in a browser, or serve it with any static file server:
-
-```bash
-# Using Python
-cd frontend
-python3 -m http.server 8080
-# Then open http://localhost:8080
-```
-
-```bash
-# Using Node.js (npx serve)
-cd frontend
-npx serve .
-# Then open http://localhost:3000
-```
-
-### Backend connection
-
-API calls and socket events are currently **pointed at `http://localhost:3000`** (disconnected from the live backend). The real-time socket is also stubbed out with a no-op object so the UI loads without errors.
-
-To reconnect to a backend, edit the top of `frontend/app.js`:
+There is no build step. Configuration is set via top-level constants in `app.js`:
 
 ```js
-const API_BASE   = 'http://localhost:3000/api';   // change to your backend URL
-const SOCKET_URL = 'http://localhost:3000';        // change to your backend URL
-const MAPBOX_TOKEN = 'YOUR_MAPBOX_PUBLIC_TOKEN_HERE'; // get one at https://account.mapbox.com/
-// and replace the socket stub with:
-// const socket = io(SOCKET_URL);
+const API_BASE        = 'http://localhost:3000/api';
+const SOCKET_URL      = 'http://localhost:3000';
+const VAPID_PUBLIC_KEY = '<your-vapid-public-key>';
+const MAPBOX_TOKEN    = '<your-mapbox-public-token>';  // get one at https://account.mapbox.com/
 ```
 
-See [`frontend/README.md`](./frontend/README.md) and [`frontend/.env.example`](./frontend/.env.example) for the full backend environment variable reference.
+See [`.env.example`](.env.example) for the full list of required **backend** environment variables.
 
----
+## OTP Authentication
 
-## Next.js app
+The login flow uses a phone-based OTP (one-time password):
 
-The Next.js application lives at the repository root (`app/`, `package.json`, etc.) and is separate from the vanilla-JS frontend above.
+1. User enters a **10-digit mobile number** (formatted as `XXXX-XXX-XXX` in the UI).
+2. The frontend calls `POST /api/auth/send-otp` with `{ "phone": "<10 digits>" }`.
+3. The backend sends a 6-digit OTP via SMS and returns `{ "success": true }`.
+4. The user types the 6-digit code into the verification screen.
+5. The frontend calls `POST /api/auth/verify` with `{ "phone": "...", "otp": "..." }`.
+6. On success the backend returns `{ "success": true, "isNewUser": bool, "user": {...} }`.
+
+### Error handling
+
+| Scenario | Frontend behaviour |
+|---|---|
+| Network / server unreachable | Inline error on the phone field — no browser `alert()` |
+| HTTP 429 (rate-limited) | Inline message: *"Too many requests. Please wait…"* |
+| Other non-2xx response | Backend `message` shown inline on the relevant field |
+| Wrong OTP | Error shown below the OTP boxes; boxes are cleared |
+| Network failure during verify | Inline error below OTP boxes |
+
+### Resend OTP
+
+A **Resend OTP** button appears on the verification screen. It is disabled for 30 seconds after each send to avoid spamming the backend. The countdown is shown in the button label.
+
+### Change number
+
+A **Change number** link on the verification screen navigates back to the phone-entry screen so users can correct a typo without reloading the app.
+
+### Required backend variables
+
+```
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=+1XXXXXXXXXX
+OTP_EXPIRY_SECONDS=300
+ALLOWED_ORIGINS=https://your-frontend.com
+```
+
+Ensure your backend sets `Access-Control-Allow-Origin` for the frontend origin and returns JSON error bodies (`{ "success": false, "message": "..." }`) for all 4xx/5xx responses so the frontend can surface descriptive error messages.
+
+## Push Notifications
+
+See [`.env.example`](.env.example) for VAPID setup instructions.
