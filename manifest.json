@@ -1,9 +1,12 @@
 {
-  "name": "MediFlow",
-  "short_name": "MediFlow",
-  "description": "Your digital pharmacy.",
+  "name": "RxPhysis Super Admin",
+  "short_name": "RxPhysis Admin",
+  "description": "Super Admin Dashboard for RxPhysis Healthcare Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#055C61",
-  "theme_color": "#0A858C"
+  "theme_color": "#0A858C",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" }
+  ]
 }
