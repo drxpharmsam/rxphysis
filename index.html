@@ -1019,7 +1019,7 @@ body.authenticated #authGate { display: none; }
 <body>
 <div id="authGate">
   <div class="auth-card">
-    <button type="button" class="auth-logo" id="authRevealTrigger" aria-label="Secure access trigger">
+    <button type="button" class="auth-logo" id="authRevealTrigger" aria-label="Toggle elevated authentication mode">
       <i class="fas fa-shield-halved"></i>
     </button>
     <div class="auth-title">RxPhysis Admin Access</div>
@@ -1214,6 +1214,13 @@ const APP = {
 };
 
 const AUTH_SESSION_KEY = 'rxphysis_admin_session';
+const AUTH_LOCK_KEY = 'rxphysis_auth_lock_until';
+const REVEAL_TAP_TIMEOUT_MS = 2000;
+const REVEAL_TAP_COUNT = 5;
+const MAIN_ADMIN_MAX_ATTEMPTS = 3;
+const SUB_ADMIN_MAX_ATTEMPTS = 5;
+const MAIN_ADMIN_LOCKOUT_MS = 120000;
+const SUB_ADMIN_LOCKOUT_MS = 30000;
 const AUTH_USERS = {
   mainAdmin: {
     identifierHash: '704cfef1391f777bfb6d4b929636f5c7ac9f59747e461f23201d19dc3ba6a395',
@@ -1222,9 +1229,9 @@ const AUTH_USERS = {
     secretHash: 'd4b2d19332fa1934b607d6b5fd0befebde44a42b982fed92187810e9507d695e'
   },
   subAdmins: [
-    { identifier: 'manager.mumbai@rxphysis.in', password: 'Manager@123', otp: '246810', name: 'City Manager - Mumbai', role: 'City Manager' },
-    { identifier: 'manager.kochi@rxphysis.in', password: 'Manager@456', otp: '135790', name: 'City Manager - Kochi', role: 'City Manager' },
-    { identifier: 'finance@rxphysis.in', password: 'Finance@123', otp: '112233', name: 'Finance Admin', role: 'Finance Admin' }
+    { identifier: 'manager.mumbai@rxphysis.in', identifierHash: 'ba0f567d287ecab0cf4f66598206fa25efbc89258af2923c07e65a3e769b6731', passwordHash: 'e8392925a98c9c22795d1fc5d0dfee5b9a6943f6b768ec5a2a0c077e5ed119cf', otpHash: '7c2523c985881fb2c2b4cfbe917eb12c4c4b61e898ad4e7160cfca487ca3c4f3', name: 'City Manager - Mumbai', role: 'City Manager' },
+    { identifier: 'manager.kochi@rxphysis.in', identifierHash: '9281c6a48cd8723cbb0b926586a52fea20ac378d27f235b116088823f0837b47', passwordHash: '89d474b0fa10561289d6bea88f0baa70b079923ae8388222ecdf8360502ed065', otpHash: 'dec58ab7d7f9fb6bd366cea633274ef3632f8eaa823bf811c14bed255d60e339', name: 'City Manager - Kochi', role: 'City Manager' },
+    { identifier: 'finance@rxphysis.in', identifierHash: 'd5f25749d31c0ed9a2f24ade034a8f4ca75f09d659f0ac9876cf5282d1014f0a', passwordHash: '2d1e746e1e575b7c6a0b479d1ee3e410a4b5040da669a5c9fab62d80f65445bf', otpHash: 'e0bc60c82713f64ef8a57c0c40d02ce24fd0141d5cc3086259c19b1e62a62bea', name: 'Finance Admin', role: 'Finance Admin' }
   ]
 };
 
@@ -1697,6 +1704,12 @@ function setAuthMode(revealMainAdmin) {
   if (mode) mode.textContent = APP.auth.revealMainAdmin ? 'Enhanced secure authentication enabled' : 'Standard sub-admin authentication enabled';
 }
 
+function restoreLockState() {
+  const lockUntil = Number(localStorage.getItem(AUTH_LOCK_KEY) || 0);
+  APP.auth.lockUntil = lockUntil > Date.now() ? lockUntil : 0;
+  if (!APP.auth.lockUntil) localStorage.removeItem(AUTH_LOCK_KEY);
+}
+
 function setSession(session) {
   APP.session = session;
   sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
@@ -1713,7 +1726,7 @@ function updateSessionUI() {
   const avatar = document.getElementById('adminAvatar');
   const tag = document.getElementById('brandRoleTag');
   const current = APP.session || { name: 'Super Admin', role: 'Full Access' };
-  const initials = current.name.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase() || 'SA';
+  const initials = current.name.split(' ').filter(Boolean).map(x => x[0]).join('').slice(0, 2).toUpperCase() || 'SA';
   if (name) name.textContent = current.name;
   if (role) role.textContent = current.role;
   if (avatar) avatar.textContent = initials;
@@ -1721,6 +1734,10 @@ function updateSessionUI() {
 }
 
 function isLockedOut() {
+  if (APP.auth.lockUntil && Date.now() >= APP.auth.lockUntil) {
+    APP.auth.lockUntil = 0;
+    localStorage.removeItem(AUTH_LOCK_KEY);
+  }
   return Date.now() < APP.auth.lockUntil;
 }
 
@@ -1729,19 +1746,18 @@ function getLockoutMessage() {
   return `Too many failed attempts. Try again in ${seconds}s.`;
 }
 
-function authenticateSubAdmin(identifier, password, otp) {
-  const user = AUTH_USERS.subAdmins.find(u => u.identifier === identifier);
+async function authenticateSubAdmin(identifier, password, otp) {
+  if (!(window.crypto && window.crypto.subtle)) return null;
+  const identifierHash = await sha256Hex(identifier);
+  const user = AUTH_USERS.subAdmins.find(u => u.identifierHash === identifierHash);
   if (!user) return null;
-  if (user.password !== password || user.otp !== otp) return null;
+  const [passwordHash, otpHash] = await Promise.all([sha256Hex(password), sha256Hex(otp)]);
+  if (user.passwordHash !== passwordHash || user.otpHash !== otpHash) return null;
   return { name: user.name, role: user.role, identifier: user.identifier, level: 'sub-admin' };
 }
 
 async function authenticateMainAdmin(identifier, password, otp, secret) {
-  if (!(window.crypto && window.crypto.subtle)) {
-    if (identifier !== atob('cm9vdEByeHBoeXNpcy5pbg==')) return null;
-    if (password !== atob('Um9vdEA5MzA1Iw==') || otp !== atob('OTMwNTAx') || secret !== atob('UlhQLU1BSU4tTE9DSw==')) return null;
-    return { name: 'Super Admin', role: 'Full Access', identifier: 'root@rxphysis.in', level: 'main-admin' };
-  }
+  if (!(window.crypto && window.crypto.subtle)) return null;
   const root = AUTH_USERS.mainAdmin;
   const [identifierHash, passwordHash, otpHash, secretHash] = await Promise.all([
     sha256Hex(identifier),
@@ -1756,11 +1772,12 @@ async function authenticateMainAdmin(identifier, password, otp, secret) {
 
 function trackAuthFailure() {
   APP.auth.failedAttempts += 1;
-  const maxAttempts = APP.auth.revealMainAdmin ? 3 : 5;
-  const lockTime = APP.auth.revealMainAdmin ? 120000 : 30000;
+  const maxAttempts = APP.auth.revealMainAdmin ? MAIN_ADMIN_MAX_ATTEMPTS : SUB_ADMIN_MAX_ATTEMPTS;
+  const lockTime = APP.auth.revealMainAdmin ? MAIN_ADMIN_LOCKOUT_MS : SUB_ADMIN_LOCKOUT_MS;
   if (APP.auth.failedAttempts >= maxAttempts) {
     APP.auth.lockUntil = Date.now() + lockTime;
     APP.auth.failedAttempts = 0;
+    localStorage.setItem(AUTH_LOCK_KEY, String(APP.auth.lockUntil));
   }
 }
 
@@ -1773,6 +1790,7 @@ function completeLogin(session) {
   setAuthError('');
   const f = document.getElementById('authForm');
   if (f) f.reset();
+  localStorage.removeItem(AUTH_LOCK_KEY);
   if (APP.data && APP.data.auditLog) addAudit('LOGIN', 'auth', `${session.name} (${session.role}) signed in`);
 }
 
@@ -1789,6 +1807,10 @@ function logout() {
 
 async function handleAuthSubmit(e) {
   e.preventDefault();
+  if (!(window.crypto && window.crypto.subtle)) {
+    setAuthError('Secure authentication requires a modern HTTPS browser context.');
+    return;
+  }
   if (isLockedOut()) {
     setAuthError(getLockoutMessage());
     return;
@@ -1800,7 +1822,7 @@ async function handleAuthSubmit(e) {
   const secret = String(form.get('secret') || '').trim();
   let session = null;
   if (APP.auth.revealMainAdmin) session = await authenticateMainAdmin(identifier, password, otp, secret);
-  else session = authenticateSubAdmin(identifier, password, otp);
+  else session = await authenticateSubAdmin(identifier, password, otp);
   if (!session) {
     trackAuthFailure();
     setAuthError(isLockedOut() ? getLockoutMessage() : 'Authentication failed. Check your credentials.');
@@ -1813,10 +1835,10 @@ async function handleAuthSubmit(e) {
 
 function handleRevealTrigger() {
   const now = Date.now();
-  if (now - APP.auth.lastRevealTap > 2200) APP.auth.revealTapCount = 0;
+  if (now - APP.auth.lastRevealTap > REVEAL_TAP_TIMEOUT_MS) APP.auth.revealTapCount = 0;
   APP.auth.lastRevealTap = now;
   APP.auth.revealTapCount += 1;
-  if (APP.auth.revealTapCount >= 5) {
+  if (APP.auth.revealTapCount >= REVEAL_TAP_COUNT) {
     setAuthMode(!APP.auth.revealMainAdmin);
     APP.auth.revealTapCount = 0;
     setAuthError('');
@@ -1829,7 +1851,19 @@ function bindAuth() {
   const form = document.getElementById('authForm');
   const trigger = document.getElementById('authRevealTrigger');
   if (form) form.addEventListener('submit', handleAuthSubmit);
-  if (trigger) trigger.addEventListener('click', handleRevealTrigger);
+  if (trigger) {
+    trigger.addEventListener('click', handleRevealTrigger);
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleRevealTrigger();
+      }
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (document.body.classList.contains('authenticated')) return;
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') handleRevealTrigger();
+  });
 }
 
 function restoreSession() {
@@ -1837,12 +1871,16 @@ function restoreSession() {
     const raw = sessionStorage.getItem(AUTH_SESSION_KEY);
     if (!raw) return false;
     const session = JSON.parse(raw);
-    if (!session || !session.identifier) return false;
+    if (!session || !session.identifier) { clearSession(); return false; }
+    if (session.level === 'main-admin') { clearSession(); return false; }
+    const valid = AUTH_USERS.subAdmins.some(u => u.identifier === session.identifier && u.name === session.name && u.role === session.role);
+    if (!valid) { clearSession(); return false; }
     APP.session = session;
     updateSessionUI();
     document.body.classList.add('authenticated');
     return true;
   } catch (e) {
+    clearSession();
     return false;
   }
 }
@@ -3636,6 +3674,7 @@ function initApp() {
   bindAuth();
   updateSessionUI();
   setAuthMode(false);
+  restoreLockState();
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
   });
