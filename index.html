@@ -73,31 +73,60 @@ body:not(.authenticated) #app { display: none; }
   display: grid;
   place-items: center;
   padding: 24px;
-  background: radial-gradient(circle at 10% 10%, var(--c1), transparent 40%), radial-gradient(circle at 90% 90%, #dbeafe, transparent 35%), var(--bg);
+  background:
+    radial-gradient(circle at 5% 12%, rgba(54,184,183,0.23), transparent 42%),
+    radial-gradient(circle at 90% 86%, rgba(59,130,246,0.18), transparent 36%),
+    linear-gradient(145deg, #eef6ff 0%, #f8fbff 40%, #f2f6f5 100%);
 }
 body.authenticated #authGate { display: none; }
 .auth-card {
-  width: min(460px, 100%);
-  background: white;
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border);
-  padding: 26px;
+  width: min(520px, 100%);
+  background: rgba(255,255,255,0.95);
+  border-radius: 24px;
+  box-shadow: 0 28px 70px rgba(5,92,97,0.15);
+  border: 1px solid rgba(255,255,255,0.7);
+  padding: 28px;
+  backdrop-filter: blur(8px);
 }
 .auth-logo {
-  width: 48px;
-  height: 48px;
+  width: 54px;
+  height: 54px;
   border-radius: 12px;
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: 22px;
   color: white;
   background: linear-gradient(135deg, var(--c3), var(--c5));
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 12px 28px rgba(10,133,140,0.35);
 }
-.auth-title { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+.auth-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
 .auth-sub { margin-top: 6px; color: var(--text3); font-size: 13px; }
-.auth-form { margin-top: 18px; display: grid; gap: 12px; }
+.auth-switch {
+  margin-top: 14px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f4f7f8;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.auth-switch button {
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text3);
+}
+.auth-switch button.active {
+  background: white;
+  color: var(--c5);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.auth-view { display: none; margin-top: 18px; }
+.auth-view.active { display: block; }
+.auth-form { display: grid; gap: 12px; }
 .auth-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
 .auth-group input {
   width: 100%;
@@ -105,9 +134,18 @@ body.authenticated #authGate { display: none; }
   border-radius: 10px;
   border: 1px solid var(--border2);
   outline: none;
-  background: white;
+  background: rgba(255,255,255,0.95);
 }
 .auth-group input:focus { border-color: var(--c4); box-shadow: 0 0 0 3px rgba(10,133,140,0.12); }
+.auth-group select {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background: rgba(255,255,255,0.95);
+  outline: none;
+}
+.auth-group select:focus { border-color: var(--c4); box-shadow: 0 0 0 3px rgba(10,133,140,0.12); }
 .auth-secret { display: none; }
 .auth-secret.show { display: block; }
 .auth-error {
@@ -116,11 +154,23 @@ body.authenticated #authGate { display: none; }
   color: var(--error);
   font-weight: 600;
 }
+.auth-passkey {
+  margin-top: 12px;
+  border: 1px dashed rgba(5,92,97,0.25);
+  background: rgba(224,247,246,0.55);
+  border-radius: 12px;
+  padding: 11px 12px;
+  font-size: 12px;
+  color: var(--text2);
+  display: none;
+}
+.auth-passkey.show { display: block; }
 .auth-note {
   margin-top: 10px;
   font-size: 11.5px;
   color: var(--text4);
 }
+.auth-note strong { color: var(--c5); }
 
 /* ========== SIDEBAR ========== */
 #sidebar {
@@ -1023,28 +1073,79 @@ body.authenticated #authGate { display: none; }
       <i class="fas fa-shield-halved"></i>
     </button>
     <div class="auth-title">RxPhysis Admin Access</div>
-    <div class="auth-sub">Authorized personnel only.</div>
-    <form class="auth-form" id="authForm" autocomplete="off">
-      <div class="auth-group">
-        <label for="authIdentifier">Admin ID / Email</label>
-        <input id="authIdentifier" name="identifier" required>
-      </div>
-      <div class="auth-group">
-        <label for="authPassword">Password</label>
-        <input id="authPassword" name="password" type="password" required>
-      </div>
-      <div class="auth-group">
-        <label for="authOtp">Authenticator Code</label>
-        <input id="authOtp" name="otp" inputmode="numeric" maxlength="6" placeholder="6-digit code" required>
-      </div>
-      <div class="auth-group auth-secret" id="authSecretGroup">
-        <label for="authSecret">Verification Key</label>
-        <input id="authSecret" name="secret" type="password" maxlength="32">
-      </div>
-      <div class="auth-error" id="authError"></div>
-      <button class="btn btn-primary" type="submit"><i class="fas fa-right-to-bracket"></i> Login</button>
-    </form>
-    <div class="auth-note" id="authModeLabel">Standard sub-admin authentication enabled</div>
+    <div class="auth-sub">Secure biometric-first authentication.</div>
+    <div class="auth-switch">
+      <button type="button" id="authSwitchLogin" class="active">Login</button>
+      <button type="button" id="authSwitchKyc">New Admin KYC</button>
+    </div>
+    <div class="auth-view active" id="authViewLogin">
+      <form class="auth-form" id="authForm" autocomplete="off">
+        <div class="auth-group">
+          <label for="authIdentifier">Admin ID / Email</label>
+          <input id="authIdentifier" name="identifier" required>
+        </div>
+        <div class="auth-group">
+          <label for="authPassword">Password</label>
+          <input id="authPassword" name="password" type="password" required>
+        </div>
+        <div class="auth-group">
+          <label for="authOtp">Authenticator Code</label>
+          <input id="authOtp" name="otp" inputmode="numeric" maxlength="6" placeholder="6-digit code" required>
+        </div>
+        <div class="auth-group auth-secret" id="authSecretGroup">
+          <label for="authSecret">Verification Key</label>
+          <input id="authSecret" name="secret" type="password" maxlength="32">
+        </div>
+        <div class="auth-passkey" id="authPasskeyHint">Credential accepted. Complete biometric passkey verification.</div>
+        <div class="auth-error" id="authError"></div>
+        <button class="btn btn-primary" type="submit"><i class="fas fa-right-to-bracket"></i> Continue</button>
+      </form>
+    </div>
+    <div class="auth-view" id="authViewKyc">
+      <form class="auth-form" id="kycForm" autocomplete="off">
+        <div class="auth-group">
+          <label for="kycIdentifier">Admin ID / Email</label>
+          <input id="kycIdentifier" name="identifier" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycName">Full Name</label>
+          <input id="kycName" name="name" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycRole">Role</label>
+          <select id="kycRole" name="role" required>
+            <option value="">Select role</option>
+            <option>City Manager</option>
+            <option>Finance Admin</option>
+            <option>Compliance Admin</option>
+            <option>Operations Admin</option>
+          </select>
+        </div>
+        <div class="auth-group">
+          <label for="kycDoc">Government ID Number</label>
+          <input id="kycDoc" name="kycDoc" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycPhone">Phone Number</label>
+          <input id="kycPhone" name="phone" inputmode="numeric" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycPassword">Set Password</label>
+          <input id="kycPassword" name="password" type="password" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycOtp">Set Authenticator Code</label>
+          <input id="kycOtp" name="otp" inputmode="numeric" maxlength="6" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycApproval">Main Admin Approval Key</label>
+          <input id="kycApproval" name="approvalKey" type="password" required>
+        </div>
+        <div class="auth-error" id="kycError"></div>
+        <button class="btn btn-primary" type="submit"><i class="fas fa-id-card"></i> Submit KYC</button>
+      </form>
+    </div>
+    <div class="auth-note" id="authModeLabel">Standard sub-admin authentication enabled — <strong>passkey required</strong></div>
   </div>
 </div>
 <div id="app">
@@ -1209,18 +1310,23 @@ const APP = {
     failedAttempts: 0,
     lockUntil: 0,
     revealTapCount: 0,
-    lastRevealTap: 0
+    lastRevealTap: 0,
+    registeredAdmins: [],
+    inactivityTimer: null
   }
 };
 
 const AUTH_SESSION_KEY = 'rxphysis_admin_session';
 const AUTH_LOCK_KEY = 'rxphysis_auth_lock_until';
+const AUTH_REGISTERED_USERS_KEY = 'rxphysis_auth_registered_users';
+const AUTH_PASSKEY_STORE_KEY = 'rxphysis_auth_passkeys';
 const REVEAL_TAP_TIMEOUT_MS = 2000;
 const REVEAL_TAP_COUNT = 5;
 const MAIN_ADMIN_MAX_ATTEMPTS = 3;
 const SUB_ADMIN_MAX_ATTEMPTS = 5;
 const MAIN_ADMIN_LOCKOUT_MS = 120000;
 const SUB_ADMIN_LOCKOUT_MS = 30000;
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 const AUTH_USERS = {
   mainAdmin: {
     identifierHash: '704cfef1391f777bfb6d4b929636f5c7ac9f59747e461f23201d19dc3ba6a395',
@@ -1685,6 +1791,45 @@ function normalizeIdentifier(v) {
   return String(v || '').trim().toLowerCase();
 }
 
+function loadRegisteredAdmins() {
+  try {
+    const raw = localStorage.getItem(AUTH_REGISTERED_USERS_KEY);
+    const users = JSON.parse(raw || '[]');
+    return Array.isArray(users) ? users : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveRegisteredAdmins(users) {
+  APP.auth.registeredAdmins = Array.isArray(users) ? users : [];
+  localStorage.setItem(AUTH_REGISTERED_USERS_KEY, JSON.stringify(APP.auth.registeredAdmins));
+}
+
+function getSubAdminUsers() {
+  return [...AUTH_USERS.subAdmins, ...APP.auth.registeredAdmins];
+}
+
+function switchAuthView(view, options = {}) {
+  const isKyc = view === 'kyc';
+  const loginView = document.getElementById('authViewLogin');
+  const kycView = document.getElementById('authViewKyc');
+  const loginBtn = document.getElementById('authSwitchLogin');
+  const kycBtn = document.getElementById('authSwitchKyc');
+  if (loginView) loginView.classList.toggle('active', !isKyc);
+  if (kycView) kycView.classList.toggle('active', isKyc);
+  if (loginBtn) loginBtn.classList.toggle('active', !isKyc);
+  if (kycBtn) kycBtn.classList.toggle('active', isKyc);
+  if (isKyc && options.prefillIdentifier) {
+    const input = document.getElementById('kycIdentifier');
+    if (input) input.value = options.prefillIdentifier;
+  }
+  if (!isKyc) {
+    const input = document.getElementById('authIdentifier');
+    if (input && !options.skipFocus) input.focus();
+  }
+}
+
 async function sha256Hex(value) {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -1696,12 +1841,19 @@ function setAuthError(msg) {
   if (el) el.textContent = msg || '';
 }
 
+function setKycError(msg) {
+  const el = document.getElementById('kycError');
+  if (el) el.textContent = msg || '';
+}
+
 function setAuthMode(revealMainAdmin) {
   APP.auth.revealMainAdmin = !!revealMainAdmin;
   const secret = document.getElementById('authSecretGroup');
   const mode = document.getElementById('authModeLabel');
   if (secret) secret.classList.toggle('show', APP.auth.revealMainAdmin);
-  if (mode) mode.textContent = APP.auth.revealMainAdmin ? 'Enhanced secure authentication enabled' : 'Standard sub-admin authentication enabled';
+  if (mode) mode.innerHTML = APP.auth.revealMainAdmin
+    ? 'Enhanced secure authentication enabled — <strong>passkey required</strong>'
+    : 'Standard sub-admin authentication enabled — <strong>passkey required</strong>';
 }
 
 function restoreLockState() {
@@ -1711,13 +1863,21 @@ function restoreLockState() {
 }
 
 function setSession(session) {
-  APP.session = session;
-  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  APP.session = {
+    ...session,
+    loggedInAt: Date.now(),
+    lastActivityAt: Date.now()
+  };
+  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(APP.session));
 }
 
 function clearSession() {
   APP.session = null;
   sessionStorage.removeItem(AUTH_SESSION_KEY);
+  if (APP.auth.inactivityTimer) {
+    clearTimeout(APP.auth.inactivityTimer);
+    APP.auth.inactivityTimer = null;
+  }
 }
 
 function updateSessionUI() {
@@ -1746,10 +1906,104 @@ function getLockoutMessage() {
   return `Too many failed attempts. Try again in ${seconds}s.`;
 }
 
+function persistSessionActivity() {
+  if (!APP.session) return;
+  APP.session.lastActivityAt = Date.now();
+  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(APP.session));
+}
+
+function startInactivityTimer() {
+  if (APP.auth.inactivityTimer) clearTimeout(APP.auth.inactivityTimer);
+  if (!APP.session) return;
+  APP.auth.inactivityTimer = setTimeout(() => {
+    logout('inactive');
+    showToast('Session expired after 30 minutes of inactivity. Please login again.', 'warning');
+  }, INACTIVITY_TIMEOUT_MS);
+}
+
+function handleActivityPing() {
+  if (!document.body.classList.contains('authenticated') || !APP.session) return;
+  persistSessionActivity();
+  startInactivityTimer();
+}
+
+function bindInactivityTracking() {
+  ['click', 'keydown', 'scroll', 'touchstart', 'pointerdown'].forEach((evt) => {
+    document.addEventListener(evt, handleActivityPing, { passive: true });
+  });
+}
+
+async function getPasskeyStore() {
+  try {
+    const raw = localStorage.getItem(AUTH_PASSKEY_STORE_KEY);
+    const parsed = JSON.parse(raw || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function toBase64Url(bytes) {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function fromBase64Url(value) {
+  const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+}
+
+async function runPasskeyVerification(identifier) {
+  const hint = document.getElementById('authPasskeyHint');
+  if (hint) hint.classList.add('show');
+  if (!(window.PublicKeyCredential && navigator.credentials)) {
+    if (hint) hint.classList.remove('show');
+    return false;
+  }
+  const store = await getPasskeyStore();
+  const known = store[identifier];
+  try {
+    if (!known) {
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          rp: { name: 'RxPhysis Admin' },
+          user: { id: crypto.getRandomValues(new Uint8Array(32)), name: identifier, displayName: identifier },
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+          timeout: 60000,
+          authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' },
+          attestation: 'none'
+        }
+      });
+      if (!credential) {
+        if (hint) hint.classList.remove('show');
+        return false;
+      }
+      store[identifier] = { credentialId: toBase64Url(credential.rawId) };
+      localStorage.setItem(AUTH_PASSKEY_STORE_KEY, JSON.stringify(store));
+      if (hint) hint.classList.remove('show');
+      return true;
+    }
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ type: 'public-key', id: fromBase64Url(known.credentialId) }],
+        timeout: 60000,
+        userVerification: 'required'
+      }
+    });
+    if (hint) hint.classList.remove('show');
+    return !!assertion;
+  } catch (error) {
+    if (hint) hint.classList.remove('show');
+    return false;
+  }
+}
+
 async function authenticateSubAdmin(identifier, password, otp) {
   if (!(window.crypto && window.crypto.subtle)) return null;
   const identifierHash = await sha256Hex(identifier);
-  const user = AUTH_USERS.subAdmins.find(u => u.identifierHash === identifierHash);
+  const user = getSubAdminUsers().find(u => u.identifierHash === identifierHash);
   if (!user) return null;
   const [passwordHash, otpHash] = await Promise.all([sha256Hex(password), sha256Hex(otp)]);
   if (user.passwordHash !== passwordHash || user.otpHash !== otpHash) return null;
@@ -1788,19 +2042,24 @@ function completeLogin(session) {
   updateSessionUI();
   document.body.classList.add('authenticated');
   setAuthError('');
+  setKycError('');
+  switchAuthView('login', { skipFocus: true });
   const f = document.getElementById('authForm');
   if (f) f.reset();
   localStorage.removeItem(AUTH_LOCK_KEY);
+  startInactivityTimer();
   if (APP.data && APP.data.auditLog) addAudit('LOGIN', 'auth', `${session.name} (${session.role}) signed in`);
 }
 
-function logout() {
-  if (APP.data && APP.data.auditLog && APP.session) addAudit('LOGOUT', 'auth', `${APP.session.name} signed out`);
+function logout(reason = 'manual') {
+  if (reason === 'manual' && !window.confirm('Are you sure you want to logout?')) return;
+  if (APP.data && APP.data.auditLog && APP.session) addAudit('LOGOUT', 'auth', `${APP.session.name} signed out (${reason})`);
   clearSession();
   setAuthMode(false);
   document.body.classList.remove('authenticated');
   updateSessionUI();
   setAuthError('');
+  setKycError('');
   const input = document.getElementById('authIdentifier');
   if (input) input.focus();
 }
@@ -1824,13 +2083,84 @@ async function handleAuthSubmit(e) {
   if (APP.auth.revealMainAdmin) session = await authenticateMainAdmin(identifier, password, otp, secret);
   else session = await authenticateSubAdmin(identifier, password, otp);
   if (!session) {
+    const identifierHash = await sha256Hex(identifier);
+    const knownUser = getSubAdminUsers().some(u => u.identifierHash === identifierHash);
+    if (!APP.auth.revealMainAdmin && !knownUser) {
+      switchAuthView('kyc', { prefillIdentifier: identifier });
+      setAuthError('');
+      setKycError('Account not found. Please register through the New Admin KYC process.');
+      return;
+    }
     trackAuthFailure();
     setAuthError(isLockedOut() ? getLockoutMessage() : 'Authentication failed. Check your credentials.');
+    return;
+  }
+  const passkeyOk = await runPasskeyVerification(session.identifier);
+  if (!passkeyOk) {
+    setAuthError('Passkey verification failed, was cancelled, or is unavailable.');
     return;
   }
   completeLogin(session);
   navigate(APP.currentSection || 'dashboard');
   showToast(`Welcome, ${session.name}`, 'success');
+}
+
+async function handleKycSubmit(e) {
+  e.preventDefault();
+  if (!(window.crypto && window.crypto.subtle)) {
+    setKycError('Secure KYC onboarding requires a modern HTTPS browser context.');
+    return;
+  }
+  const form = new FormData(e.target);
+  const identifier = normalizeIdentifier(form.get('identifier'));
+  const name = String(form.get('name') || '').trim();
+  const role = String(form.get('role') || '').trim();
+  const kycDoc = String(form.get('kycDoc') || '').trim();
+  const phone = String(form.get('phone') || '').trim();
+  const password = String(form.get('password') || '').trim();
+  const otp = String(form.get('otp') || '').trim();
+  const approvalKey = String(form.get('approvalKey') || '').trim();
+  if (!identifier || !name || !role || !kycDoc || !phone || !password || !otp || !approvalKey) {
+    setKycError('All KYC fields are required.');
+    return;
+  }
+  const identifierHash = await sha256Hex(identifier);
+  const exists = getSubAdminUsers().some(u => u.identifierHash === identifierHash);
+  if (exists) {
+    setKycError('This admin ID already exists. Login using existing credentials.');
+    switchAuthView('login');
+    return;
+  }
+  const approvalHash = await sha256Hex(approvalKey);
+  if (approvalHash !== AUTH_USERS.mainAdmin.secretHash) {
+    setKycError('Main admin approval key is invalid.');
+    return;
+  }
+  const [passwordHash, otpHash, kycDocHash, phoneHash] = await Promise.all([
+    sha256Hex(password),
+    sha256Hex(otp),
+    sha256Hex(kycDoc),
+    sha256Hex(phone)
+  ]);
+  const users = loadRegisteredAdmins();
+  users.push({
+    identifier,
+    identifierHash,
+    passwordHash,
+    otpHash,
+    name,
+    role,
+    registeredViaKyc: true,
+    kycDocHash,
+    phoneHash,
+    kycVerifiedAt: new Date().toISOString()
+  });
+  saveRegisteredAdmins(users);
+  setKycError('');
+  showToast('KYC submitted and approved. Please complete login with passkey verification.', 'success');
+  const idInput = document.getElementById('authIdentifier');
+  if (idInput) idInput.value = identifier;
+  switchAuthView('login');
 }
 
 function handleRevealTrigger() {
@@ -1849,8 +2179,14 @@ function handleRevealTrigger() {
 
 function bindAuth() {
   const form = document.getElementById('authForm');
+  const kycForm = document.getElementById('kycForm');
   const trigger = document.getElementById('authRevealTrigger');
+  const switchLogin = document.getElementById('authSwitchLogin');
+  const switchKyc = document.getElementById('authSwitchKyc');
   if (form) form.addEventListener('submit', handleAuthSubmit);
+  if (kycForm) kycForm.addEventListener('submit', handleKycSubmit);
+  if (switchLogin) switchLogin.addEventListener('click', () => switchAuthView('login'));
+  if (switchKyc) switchKyc.addEventListener('click', () => switchAuthView('kyc'));
   if (trigger) {
     trigger.addEventListener('click', handleRevealTrigger);
     trigger.addEventListener('keydown', (e) => {
@@ -1872,12 +2208,15 @@ function restoreSession() {
     if (!raw) return false;
     const session = JSON.parse(raw);
     if (!session || !session.identifier) { clearSession(); return false; }
-    if (session.level === 'main-admin') { clearSession(); return false; }
-    const valid = AUTH_USERS.subAdmins.some(u => u.identifier === session.identifier && u.name === session.name && u.role === session.role);
+    if (Date.now() - Number(session.lastActivityAt || 0) > INACTIVITY_TIMEOUT_MS) { clearSession(); return false; }
+    const valid = session.level === 'main-admin'
+      ? session.identifier === 'root@rxphysis.in'
+      : getSubAdminUsers().some(u => u.identifier === session.identifier && u.name === session.name && u.role === session.role);
     if (!valid) { clearSession(); return false; }
     APP.session = session;
     updateSessionUI();
     document.body.classList.add('authenticated');
+    startInactivityTimer();
     return true;
   } catch (e) {
     clearSession();
@@ -3671,9 +4010,12 @@ function submitIncForm(e) {
 /* ========== INIT ========== */
 function initApp() {
   loadData();
+  APP.auth.registeredAdmins = loadRegisteredAdmins();
   bindAuth();
+  bindInactivityTracking();
   updateSessionUI();
   setAuthMode(false);
+  switchAuthView('login', { skipFocus: true });
   restoreLockState();
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
