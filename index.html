@@ -1075,8 +1075,8 @@ body.authenticated #authGate { display: none; }
     <div class="auth-title">RxPhysis Admin Access</div>
     <div class="auth-sub">Secure biometric-first authentication.</div>
     <div class="auth-switch">
-      <button type="button" id="authSwitchLogin" class="active" onclick="switchAuthView('login')">Login</button>
-      <button type="button" id="authSwitchKyc" onclick="switchAuthView('kyc')">New Admin KYC</button>
+      <button type="button" id="authSwitchLogin" class="active">Login</button>
+      <button type="button" id="authSwitchKyc">New Admin KYC</button>
     </div>
     <div class="auth-view active" id="authViewLogin">
       <form class="auth-form" id="authForm" autocomplete="off">
@@ -1128,6 +1128,18 @@ body.authenticated #authGate { display: none; }
         <div class="auth-group">
           <label for="kycPhone">Phone Number</label>
           <input id="kycPhone" name="phone" inputmode="numeric" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycPassword">Set Password</label>
+          <input id="kycPassword" name="password" type="password" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycOtp">Set Authenticator Code</label>
+          <input id="kycOtp" name="otp" inputmode="numeric" maxlength="6" required>
+        </div>
+        <div class="auth-group">
+          <label for="kycApproval">Main Admin Approval Key</label>
+          <input id="kycApproval" name="approvalKey" type="password" required>
         </div>
         <div class="auth-error" id="kycError"></div>
         <button class="btn btn-primary" type="submit"><i class="fas fa-id-card"></i> Submit KYC</button>
@@ -1916,7 +1928,7 @@ function handleActivityPing() {
 }
 
 function bindInactivityTracking() {
-  ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach((evt) => {
+  ['click', 'keydown', 'scroll', 'touchstart', 'pointerdown'].forEach((evt) => {
     document.addEventListener(evt, handleActivityPing, { passive: true });
   });
 }
@@ -1937,7 +1949,7 @@ function toBase64Url(bytes) {
 
 function fromBase64Url(value) {
   const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized + '==='.slice((normalized.length + 3) % 4);
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
   return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
 }
 
@@ -1945,9 +1957,8 @@ async function runPasskeyVerification(identifier) {
   const hint = document.getElementById('authPasskeyHint');
   if (hint) hint.classList.add('show');
   if (!(window.PublicKeyCredential && navigator.credentials)) {
-    const confirmed = window.confirm('Passkey is not available in this browser context. Continue with fallback verification?');
     if (hint) hint.classList.remove('show');
-    return confirmed;
+    return false;
   }
   const store = await getPasskeyStore();
   const known = store[identifier];
@@ -1996,7 +2007,7 @@ async function authenticateSubAdmin(identifier, password, otp) {
   if (!user) return null;
   const [passwordHash, otpHash] = await Promise.all([sha256Hex(password), sha256Hex(otp)]);
   if (user.passwordHash !== passwordHash || user.otpHash !== otpHash) return null;
-  return { name: user.name, role: user.role, identifier: user.identifier, level: 'sub-admin', isNewlyRegistered: !!user.kycDoc };
+  return { name: user.name, role: user.role, identifier: user.identifier, level: 'sub-admin' };
 }
 
 async function authenticateMainAdmin(identifier, password, otp, secret) {
@@ -2077,7 +2088,7 @@ async function handleAuthSubmit(e) {
     if (!APP.auth.revealMainAdmin && !knownUser) {
       switchAuthView('kyc', { prefillIdentifier: identifier });
       setAuthError('');
-      setKycError('User not found. Complete KYC onboarding to activate access.');
+      setKycError('Account not found. Please register through the New Admin KYC process.');
       return;
     }
     trackAuthFailure();
@@ -2086,7 +2097,7 @@ async function handleAuthSubmit(e) {
   }
   const passkeyOk = await runPasskeyVerification(session.identifier);
   if (!passkeyOk) {
-    setAuthError('Passkey verification failed or was cancelled.');
+    setAuthError('Passkey verification failed, was cancelled, or is unavailable.');
     return;
   }
   completeLogin(session);
@@ -2106,7 +2117,10 @@ async function handleKycSubmit(e) {
   const role = String(form.get('role') || '').trim();
   const kycDoc = String(form.get('kycDoc') || '').trim();
   const phone = String(form.get('phone') || '').trim();
-  if (!identifier || !name || !role || !kycDoc || !phone) {
+  const password = String(form.get('password') || '').trim();
+  const otp = String(form.get('otp') || '').trim();
+  const approvalKey = String(form.get('approvalKey') || '').trim();
+  if (!identifier || !name || !role || !kycDoc || !phone || !password || !otp || !approvalKey) {
     setKycError('All KYC fields are required.');
     return;
   }
@@ -2117,15 +2131,17 @@ async function handleKycSubmit(e) {
     switchAuthView('login');
     return;
   }
-  const authForm = document.getElementById('authForm');
-  const authData = authForm ? new FormData(authForm) : null;
-  const password = String((authData && authData.get('password')) || '').trim();
-  const otp = String((authData && authData.get('otp')) || '').trim();
-  if (!password || !otp) {
-    setKycError('Enter password and authenticator code in Login tab before KYC submission.');
+  const approvalHash = await sha256Hex(approvalKey);
+  if (approvalHash !== AUTH_USERS.mainAdmin.secretHash) {
+    setKycError('Main admin approval key is invalid.');
     return;
   }
-  const [passwordHash, otpHash] = await Promise.all([sha256Hex(password), sha256Hex(otp)]);
+  const [passwordHash, otpHash, kycDocHash, phoneHash] = await Promise.all([
+    sha256Hex(password),
+    sha256Hex(otp),
+    sha256Hex(kycDoc),
+    sha256Hex(phone)
+  ]);
   const users = loadRegisteredAdmins();
   users.push({
     identifier,
@@ -2134,8 +2150,9 @@ async function handleKycSubmit(e) {
     otpHash,
     name,
     role,
-    kycDoc,
-    phone,
+    registeredViaKyc: true,
+    kycDocHash,
+    phoneHash,
     kycVerifiedAt: new Date().toISOString()
   });
   saveRegisteredAdmins(users);
@@ -2164,8 +2181,12 @@ function bindAuth() {
   const form = document.getElementById('authForm');
   const kycForm = document.getElementById('kycForm');
   const trigger = document.getElementById('authRevealTrigger');
+  const switchLogin = document.getElementById('authSwitchLogin');
+  const switchKyc = document.getElementById('authSwitchKyc');
   if (form) form.addEventListener('submit', handleAuthSubmit);
   if (kycForm) kycForm.addEventListener('submit', handleKycSubmit);
+  if (switchLogin) switchLogin.addEventListener('click', () => switchAuthView('login'));
+  if (switchKyc) switchKyc.addEventListener('click', () => switchAuthView('kyc'));
   if (trigger) {
     trigger.addEventListener('click', handleRevealTrigger);
     trigger.addEventListener('keydown', (e) => {
